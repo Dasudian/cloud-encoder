@@ -1,0 +1,6 @@
+{application, ecpool,
+ [{vsn, "1.0"},
+  {modules, [ecpool, ecpool_serv, ecpool_sup, ecpool_supersup, ecpool_worker_sup]},
+  {registered, [ecpool]},
+  {mod, {ecpool, []}}
+ ]}.

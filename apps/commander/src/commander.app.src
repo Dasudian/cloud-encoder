@@ -1,0 +1,18 @@
+{application, commander,
+ [{vsn, "1.0.0"},
+  {modules, [commander_app, commander_sup, commander_lib,
+			 commander_srv, commander_dispatch, ftp_get_worker,
+			 ftp_put_worker, zip_worker, encode_worker, crypt_worker]},
+  {applications, [inets, ecpool]},
+  {registered, [commander_dispatch]},
+  {mod, {commander_app, []}},
+  {env, [{work_dir, "/var/encoder"},
+		 {mq_host, "bestcloud.me"},
+		 {mq_user, "bestcloud"},
+		 {mq_pass, "snuggagugga"},
+		 {mq_exchange, "cloud_encoder"},
+		 {mq_queue, "cloud_encoder_hk"},
+		 {mq_routing_key, "encoder.hk"},
+		 {max_queue, 4}]}
+ ]}.
+

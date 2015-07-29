@@ -1,0 +1,3 @@
+#!/bin/sh
+openssl enc -aes-128-cbc -in $1 -out crypt_$1 -K $2 -iv $3
+mv -f crypt_$1 $1

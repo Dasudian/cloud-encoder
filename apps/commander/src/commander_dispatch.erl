@@ -4,6 +4,7 @@
     encode/5,
     encode/6,
     ftp_get_complete/6,
+    riakcs_get_complete/7,
     encode_complete/7,
     encrypt_complete/4,
     zip_complete/4,
@@ -56,6 +57,9 @@ ftp_get_complete(Pid, Path, Code, Profiles, WithDrm, TgtFtp) ->
 ftp_put_complete(Pid, Code) ->
     gen_fsm:send_all_state_event(Pid, {ftp_put_complete, Code}).
 
+riakcs_get_complete(DispatcherPid, RiakcsInfo, Filename, Code, Profiles, WithDrm, Encryption_Key) ->
+    gen_fsm:send_all_state_event(DispatcherPid, {riakcs_get_complete, RiakcsInfo, Filename, Code, Profiles, WithDrm, Encryption_Key}).
+
 encode_complete(Pid, Path, Code, Profile, Profiles, WithDrm, TgtFtp) ->
     gen_fsm:send_all_state_event(Pid, {encode_complete, Path, Code, Profile, Profiles, WithDrm, TgtFtp}).
 
@@ -81,7 +85,6 @@ init([]) ->
     {ok, dispatching, #data{work_dir = Dir, refs = []}}.
 
 dispatching({encode, SrvPid, FtpInfo, Code, Profiles, WithDrm}, Data = #data{work_dir = Dir, refs = Refs}) ->
-    io:format("~n dispatching ~n"),
     ecpool:async_queue(?FTP_GET_POOL, [self(), FtpInfo, Code, Profiles, WithDrm, Dir]),
     {next_state, dispatching, Data#data{refs = [{Code, 0} | Refs], srv_pid = SrvPid}};
 dispatching({encode, SrvPid, RiakcsInfo, Code, Profiles, WithDrm, Encryption_Key}, Data = #data{work_dir = Dir, refs = Refs}) ->

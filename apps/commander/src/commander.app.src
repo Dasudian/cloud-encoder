@@ -3,7 +3,7 @@
   {modules, [commander_app, commander_sup, commander_lib,
 			 commander_srv, commander_dispatch, ftp_get_worker,
 			 ftp_put_worker, zip_worker, encode_worker, crypt_worker]},
-  {applications, [inets, ecpool]},
+  {applications, [inets,erlcloud,rabbit_common,amqp_client,ecpool]},
   {registered, [commander_dispatch]},
   {mod, {commander_app, []}},
   {env, [{work_dir, "/var/encoder"},

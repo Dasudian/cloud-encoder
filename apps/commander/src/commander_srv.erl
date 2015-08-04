@@ -113,6 +113,14 @@ handle_info({finish, Code}, State = #state{channel = Channel, exchange = Exc, ro
     commander_lib:log("~n~n~~~~~~~~~~Video: ~p Finish !!! ~~~~~~~~~~~n~n", [Code]),
     {noreply, State};
 
+handle_info({finish, Code, Bucket, Zipkey, M3u8Key}, State = #state{channel = Channel, exchange = Exc, routing = Route}) ->
+    Publish = #'basic.publish'{exchange = list_to_binary(Exc), routing_key = list_to_binary(Route ++ ".finish")},
+    Props = #'P_basic'{delivery_mode = 2}, %%persistent message
+    Msg = encode(Code, Bucket, Zipkey, M3u8Key),
+    amqp_channel:cast(Channel, Publish, #amqp_msg{props = Props, payload = list_to_binary(Msg)}),
+    commander_lib:log("~n~n~~~~~~~~~~Video: ~p Finish !!! ~~~~~~~~~~~n~n", [Msg]),
+    {noreply, State};
+
 % handle_info generic fallback (ignore)
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -173,3 +181,7 @@ decode(Payload) ->
     WithDrm = proplists:get_value(withDRM, Props),
     Encryption_Key = proplists:get_value(key, Props),
     {{Access_key_id, Secret_access_key, S3_host, S3_port}, Code, Bucket, File_id, Profiles, WithDrm, Encryption_Key}.
+
+
+encode(Code, Bucket, Zipkey, M3u8Key) ->
+    "{\"code\":" ++ "\"" ++ Code ++ "\"" ++ ",\"media_source\":{\"bucket\":" ++ "\"" ++ Bucket ++ "\"" ++ ",\"key\":" ++ "\"" ++ Zipkey ++ "\"" ++ "}" ++ ",\"m3u8_source\":{\"bucket\":" ++ "\"" ++ Bucket ++ "\"" ++ ",\"key\":" ++ "\"" ++ M3u8Key ++ "\"" ++ "}" ++ "}".

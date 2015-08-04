@@ -4,11 +4,13 @@
     encode/5,
     encode/6,
     ftp_get_complete/6,
-    riakcs_get_complete/7,
+    riakcs_get_complete/8,
     encode_complete/7,
+    encode_complete/9,
     encrypt_complete/4,
-    zip_complete/4,
-    ftp_put_complete/2]).
+    zip_complete/5,
+    ftp_put_complete/2,
+    riakcs_put_complete/5]).
 -export([init/1, dispatching/2, handle_event/3,
     handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
@@ -57,17 +59,28 @@ ftp_get_complete(Pid, Path, Code, Profiles, WithDrm, TgtFtp) ->
 ftp_put_complete(Pid, Code) ->
     gen_fsm:send_all_state_event(Pid, {ftp_put_complete, Code}).
 
-riakcs_get_complete(DispatcherPid, RiakcsInfo, Filename, Code, Profiles, WithDrm, Encryption_Key) ->
-    gen_fsm:send_all_state_event(DispatcherPid, {riakcs_get_complete, RiakcsInfo, Filename, Code, Profiles, WithDrm, Encryption_Key}).
+-spec riakcs_get_complete(pid(), string(), string(), [string()], boolean(), string(), riakcs_get_worker:config(), string()) -> ok.
+riakcs_get_complete(DispatcherPid, FileDir, Code, Profiles, WithDrm, Encryption_Key, Config, M3u8File) ->
+    gen_fsm:send_all_state_event(DispatcherPid, {riakcs_get_complete, FileDir, Code, Profiles, WithDrm, Encryption_Key, Config, M3u8File}).
+
+
+riakcs_put_complete(DispatcherPid, Code, Bucket, Zipkey, M3u8Key) ->
+    gen_fsm:send_all_state_event(DispatcherPid, {riakcs_put_complete, Code, Bucket, Zipkey, M3u8Key}).
 
 encode_complete(Pid, Path, Code, Profile, Profiles, WithDrm, TgtFtp) ->
     gen_fsm:send_all_state_event(Pid, {encode_complete, Path, Code, Profile, Profiles, WithDrm, TgtFtp}).
 
+encode_complete(Pid, Path, Code, Profile, Profiles, WithDrm, Encryption_key, Config, M3u8File) ->
+    gen_fsm:send_all_state_event(Pid, {encode_complete, Path, Code, Profile, Profiles, WithDrm, Encryption_key, Config, M3u8File}).
+
 encrypt_complete(Pid, Path, Code, TgtFtp) ->
     gen_fsm:send_all_state_event(Pid, {encrypt_complete, Path, Code, TgtFtp}).
 
-zip_complete(Pid, Zip, Code, TgtFtp) ->
-    gen_fsm:send_all_state_event(Pid, {zip_complete, Zip, Code, TgtFtp}).
+%zip_complete(Pid, Zip, Code, TgtFtp) ->
+%    gen_fsm:send_all_state_event(Pid, {zip_complete, Zip, Code, TgtFtp}).
+
+zip_complete(Pid, Zip, M3u8File, Code, Config) ->
+    gen_fsm:send_all_state_event(Pid, {zip_complete, Zip, M3u8File, Code, Config}).
 
 %%% GEN_FSM
 %% Two states: dispatching and listening
@@ -95,6 +108,12 @@ handle_event({ftp_get_complete, Path, Code, Profiles, WithDrm, TgtFtp}, State, D
     commander_lib:log("FTP get for Media: ~p finished at ~p", [Code, Path]),
     [ecpool:async_queue(?ENC_POOL, [self(), Path, Code, Profile, Profiles, WithDrm, TgtFtp, Dir]) || Profile <- Profiles],
     {next_state, State, Data};
+
+handle_event({riakcs_get_complete, FileDir, Code, Profiles, WithDrm, Encryption_Key, Config, M3u8File}, State, Data = #data{work_dir = Dir}) ->
+    commander_lib:log("riakcs get for Media: ~p finished at ~p", [Code, FileDir]),
+    [ecpool:async_queue(?ENC_POOL, [self(), FileDir, Code, Profile, Profiles, WithDrm, Encryption_Key, Config, M3u8File, Dir]) || Profile <- Profiles],
+    {next_state, State, Data};
+
 handle_event({encode_complete, Path, Code, Profile, Profiles, WithDrm, TgtFtp}, State, Data = #data{work_dir = Dir, refs = Refs}) ->
     commander_lib:log("Encoding for Media: ~p finished at ~p with Profile ~p", [Code, Path, Profile]),
     {Code, Counts} = proplists:lookup(Code, Refs),
@@ -112,18 +131,55 @@ handle_event({encode_complete, Path, Code, Profile, Profiles, WithDrm, TgtFtp}, 
                 Refs -- [{Code, length(Profiles) - 1}]
         end,
     {next_state, State, Data#data{refs = NewRefs}};
+
+handle_event({encode_complete, Path, Code, Profile, Profiles, WithDrm, Encryption_key, Config, M3u8File}, State, Data = #data{work_dir = Dir, refs = Refs}) ->
+    commander_lib:log("Encoding for Media: ~p finished at ~p with Profile ~p", [Code, Path, Profile]),
+    {Code, Counts} = proplists:lookup(Code, Refs),
+    NewRefs =
+        if
+            Counts + 1 < length(Profiles) ->
+                lists:keyreplace(Code, 1, Refs, {Code, Counts + 1});
+            true ->
+                case WithDrm of
+                    false ->
+                        ecpool:async_queue(?ZIP_POOL, [self(), Path, Code, Dir, Config, M3u8File]);
+                    true ->
+                        ecpool:async_queue(?CRYPT_POOL, [self(), Path, Code, Profiles, Encryption_key])
+                end,
+                Refs -- [{Code, length(Profiles) - 1}]
+        end,
+    {next_state, State, Data#data{refs = NewRefs}};
+
+
 handle_event({encrypt_complete, Path, Code, TgtFtp}, State, Data = #data{work_dir = Dir}) ->
     commander_lib:log("Encryption for Media: ~p finished at ~p", [Code, Path]),
     ecpool:async_queue(?ZIP_POOL, [self(), Path, Code, TgtFtp, Dir]),
     {next_state, State, Data};
+
+
 handle_event({zip_complete, Zip, Code, TgtFtp}, State, Data = #data{work_dir = Dir}) ->
     commander_lib:log("Zipping for Media: ~p finished at ~p", [Code, Zip]),
     ecpool:async_queue(?FTP_PUT_POOL, [self(), Zip, Dir, Code, TgtFtp]),
     {next_state, State, Data};
+
+
+handle_event({zip_complete, Zip, M3u8File, Code, Config}, State, Data = #data{work_dir = Dir}) ->
+    commander_lib:log("Zipping for Media: ~p finished zip at :~p  m3u8 file at:~p", [Code, Zip, M3u8File]),
+    ecpool:async_queue(?RIAKCS_PUT_POOL, [self(), Zip, M3u8File, Dir, Code, Config]),
+    {next_state, State, Data};
+
 handle_event({ftp_put_complete, Code}, State, Data = #data{srv_pid = SrvPid}) ->
     commander_lib:log("All work done for the Media: ~p", [Code]),
     notify(SrvPid, {finish, Code}),
+    {next_state, State, Data};
+
+
+
+handle_event({riakcs_put_complete, Code, Bucket, Zipkey, M3u8Key}, State, Data = #data{srv_pid = SrvPid}) ->
+    commander_lib:log("All work done for the Media: ~p", [Code]),
+    notify(SrvPid, {finish, Code, Bucket, Zipkey, M3u8Key}),
     {next_state, State, Data}.
+
 
 handle_sync_event(Event, _From, State, Data) ->
     commander_lib:log("Unexpected event: ~p~n", [Event]),

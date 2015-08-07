@@ -48,6 +48,7 @@ handle_info(start, S = #state{riakcs_info = RiakcsInfo, code = Code, pros = Prof
     Aws_config = lib_riakcs:riakcs_init(ACCESS_KEY_ID, SECRET_ACCESS_KEY, S3_HOST, S3_PORT),
     MediaDir = filename:join(Dir, Code),
     EncodeDir = filename:join(MediaDir, Code),
+    file:set_cwd(Dir),
     os:cmd("mkdir " ++ MediaDir),
     os:cmd("mkdir " ++ EncodeDir),
     Props = lib_riakcs:select(Bucket, File_Key, Aws_config),
@@ -73,7 +74,9 @@ write_index(Path, Code, [], Con) ->
     ok = file:write_file(M3u8File, Con),
     M3u8File;
 write_index(Path, Code, [H | T], Con) ->
+    New_H = lib_util:to_list(H),
+    New_code = lib_util:to_list(Code),
     NewCon = Con ++ "#EXT-X-STREAM-INF:PROGRAM-ID = 1, BANDWIDTH = " ++
-        H ++ "\n" ++ Code ++ "/" ++ H ++ "/" ++ Code ++ "_" ++ H ++ ".m3u8\n",
+        New_H ++ "\n" ++ New_code ++ "/" ++ New_H ++ "/" ++ New_code ++ "_" ++ New_H ++ ".m3u8\n",
     write_index(Path, Code, T, NewCon).
 

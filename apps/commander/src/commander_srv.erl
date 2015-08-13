@@ -116,8 +116,8 @@ handle_info({finish, Code}, State = #state{channel = Channel, exchange = Exc, ro
 handle_info({finish, Code, Bucket, Zipkey, M3u8Key}, State = #state{channel = Channel, exchange = Exc, routing = Route}) ->
     Publish = #'basic.publish'{exchange = list_to_binary(Exc), routing_key = list_to_binary(Route ++ ".finish")},
     Props = #'P_basic'{delivery_mode = 2}, %%persistent message
-    Msg = encode(1, Code, Bucket, Zipkey, M3u8Key),
-    amqp_channel:cast(Channel, Publish, #amqp_msg{props = Props, payload = list_to_binary(Msg)}),
+    Msg = encode("1", Code, Bucket, Zipkey, M3u8Key),
+    amqp_channel:cast(Channel, Publish, #amqp_msg{props = Props, payload = Msg}),
     commander_lib:log("~n~n~~~~~~~~~~Video: ~p Finish !!! ~~~~~~~~~~~n~n", [Msg]),
     {noreply, State};
 
@@ -184,4 +184,5 @@ decode(Payload) ->
 
 
 encode(Status, Code, Bucket, Zipkey, M3u8Key) ->
-    "{\"status:\"" ++ Status ++ ",\"code\":" ++ "\"" ++ Code ++ "\"" ++ ",\"media_source\":{\"bucket\":" ++ "\"" ++ Bucket ++ "\"" ++ ",\"key\":" ++ "\"" ++ Zipkey ++ "\"" ++ "}" ++ ",\"m3u8_source\":{\"bucket\":" ++ "\"" ++ Bucket ++ "\"" ++ ",\"key\":" ++ "\"" ++ M3u8Key ++ "\"" ++ "}" ++ "}".
+    Props = [{status, Status}, {code, Code}, {media_source, [{bucket, Bucket}, {key, Zipkey}]}, {m3u8_source, [{bucket, Bucket}, {key, M3u8Key}]}],
+    lib_json:to_json(Props).

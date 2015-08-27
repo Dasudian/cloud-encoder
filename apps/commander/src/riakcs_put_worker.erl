@@ -69,7 +69,7 @@ get_key(ZipName, M3u8Name, Basepath) ->
 upload_file(Filepath, FileType, Bucket, Key, Config) ->
     UploadId = lib_riakcs:initiate_upload(Bucket, Key, FileType, Config),
     {ok, IoDevice} = file:open(Filepath, [read, raw, binary]),
-    ok = upload(IoDevice, 1, 1, Bucket, Key, UploadId, Config, []),
+    ok = upload(IoDevice, 0, 1, Bucket, Key, UploadId, Config, []),
     ok = file:close(IoDevice).
 
 

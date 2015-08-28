@@ -55,7 +55,7 @@ handle_info(start, S = #state{riakcs_info = RiakcsInfo, code = Code, pros = Prof
     M3u8File = write_index(MediaDir, Code, Profiles),
     case string:tokens(proplists:get_value(content_type, Props), "/") of
         [] ->
-            Filename = filename:join(MediaDir, Code);
+            Filename = filename:join(MediaDir, Code ++ "." ++ "media");
         [_, VideoType] ->
             Filename = filename:join(MediaDir, Code ++ "." ++ VideoType)
     end,

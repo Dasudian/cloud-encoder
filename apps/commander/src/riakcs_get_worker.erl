@@ -52,9 +52,13 @@ handle_info(start, S = #state{riakcs_info = RiakcsInfo, code = Code, pros = Prof
     os:cmd("mkdir " ++ MediaDir),
     os:cmd("mkdir " ++ EncodeDir),
     Props = lib_riakcs:select(Bucket, File_Key, Aws_config),
-    [_, VideoType] = string:tokens(proplists:get_value(content_type, Props), "/"),
     M3u8File = write_index(MediaDir, Code, Profiles),
-    Filename = filename:join(MediaDir, Code ++ "." ++ VideoType),
+    case string:tokens(proplists:get_value(content_type, Props), "/") of
+        [] ->
+            Filename = filename:join(MediaDir, Code);
+        [_, VideoType] ->
+            Filename = filename:join(MediaDir, Code ++ "." ++ VideoType)
+    end,
     file:write_file(Filename, proplists:get_value(content, Props)),
     commander_dispatch:riakcs_get_complete(S#state.dispatcher, Filename, Code, Profiles, WithDrm, Encryption_Key, RiakcsInfo, M3u8File),
     {stop, normal, S}.

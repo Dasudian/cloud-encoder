@@ -51,12 +51,12 @@ handle_cast(_Msg, State) ->
 handle_info(start, S = #state{dispatcher = Dispatcher, config = Config, m3u8File = M3u8File, file = File, code = Code, profile = Profile, pros = Profiles, drm = WithDrm, encryption_key = Encryption_key, dir = Dir}) ->
     EnCmd = filename:join(commander_lib:priv(), Profile), %eg. 720000
     Path = filename:join(Dir, Code ++ "/" ++ Code ++ "/" ++ Profile),
-    os:cmd("mkdir " ++ Path),
+    file:make_dir(Path),
     case filelib:is_file(Path) of
         true ->
             ok;
         false ->
-            os:cmd("mkdir " ++ Path)
+            file:make_dir(Path)
     end,
     os:cmd("cd " ++ Path ++ " && " ++ EnCmd ++ " " ++ File ++ " " ++ Code),
     commander_dispatch:encode_complete(Dispatcher, Path, Code, Profile, Profiles, WithDrm, Encryption_key, Config, M3u8File),

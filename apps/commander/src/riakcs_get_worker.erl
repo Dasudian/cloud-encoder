@@ -48,9 +48,8 @@ handle_info(start, S = #state{riakcs_info = RiakcsInfo, code = Code, pros = Prof
     Aws_config = lib_riakcs:riakcs_init(ACCESS_KEY_ID, SECRET_ACCESS_KEY, S3_HOST, S3_PORT),
     MediaDir = filename:join(Dir, Code),
     EncodeDir = filename:join(MediaDir, Code),
-    file:set_cwd(Dir),
-    os:cmd("mkdir " ++ MediaDir),
-    os:cmd("mkdir " ++ EncodeDir),
+    file:make_dir(MediaDir),
+    file:make_dir(EncodeDir),
     Props = lib_riakcs:select(Bucket, File_Key, Aws_config),
     M3u8File = write_index(MediaDir, Code, Profiles),
     case string:tokens(proplists:get_value(content_type, Props), "/") of

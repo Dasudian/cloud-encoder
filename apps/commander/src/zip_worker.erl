@@ -42,9 +42,8 @@ handle_cast(_Msg, State) ->
 handle_info(start, S = #state{config = Config, path = _Path, code = Code, dir = Dir, m3u8File = M3u8File}) ->
     Filename = Code ++ ".zip",
     Cwd = Dir ++ "/" ++ Code,
-    file:set_cwd(Cwd),
-    {ok, ZipFile} = zip:zip(Filename, [Code], [{cwd, Cwd}]),
-    commander_dispatch:zip_complete(S#state.dispatcher, filename:join(Cwd, ZipFile), M3u8File, Code, Config),
+    {ok, ZipFile} = zip:zip(filename:join(Cwd, Filename), [Code], [{cwd, Cwd}]),
+    commander_dispatch:zip_complete(S#state.dispatcher, ZipFile, M3u8File, Code, Config),
     {stop, normal, S}.
 
 terminate(_Reason, _State) ->
